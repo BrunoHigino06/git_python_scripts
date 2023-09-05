@@ -11,7 +11,7 @@ def clone_repository(repo_url, branch_name):
     repo_dir = os.path.join(os.getcwd(), repo_name)
 
     # Clone the repository
-    repo = git.Repo.clone_from(repo_url, repo_dir, branch= branch_name)
+    repo = git.Repo.clone_from(repo_url, repo_dir, branch=branch_name)
 
     # Check if the branch exists
     if branch_name in repo.branches:
@@ -34,12 +34,10 @@ def clone_repository(repo_url, branch_name):
 def edit_main_tf(file_path):
     # Open the main.tf file for editing
     with fileinput.FileInput(file_path, inplace=True) as file:
-        for line_number, line in enumerate(file, start=1):
-            # Modify line 4 (index 3) of the main.tf file
-            if line_number == file_line:
-                print(line_change)
-            else:
-                print(line, end='')
+        for line in file:
+            # Replace "word_find" with "word_replace" in each line
+            line = line.replace(word_find, word_replace)
+            print(line, end='')
 
 # Function to add, commit, and push changes
 def add_commit_push(repo):
@@ -62,11 +60,11 @@ target_branch = "test"
 # File name to edit
 file_name = "main.tf"
 
-# Line of the file to edit
-file_line = 4
+# word to find
+word_find = "weekend"
 
-# What needs to be added in the line of the file that will be edited
-line_change = "change made using the script"
+# work to replace
+word_replace = "develop"
 
 # Open the .txt file and clone the repositories
 with open(input_file, "r") as file:
