@@ -74,7 +74,7 @@ file_name = ".\\terraform\\vpc.tf"
 phrase = "  enable_dns_hostnames = true"
 
 # Specify the line number where you want to add the phrase
-line_number_to_add_phrase = 7
+line_number_to_add_phrase = 62
 
 # Open the .txt file and clone the repositories
 with open(input_file, "r") as file:
