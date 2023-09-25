@@ -1,0 +1,9 @@
+pci-c2-prod-sdlc,pcic2-p-sdlc.prod
+pci-non-dev-common,pcino-d-comm.dev
+pci-non-prod-common,pcino-p-comm.prod
+pci-non-qa-common,pcino-q-comm.qa
+pci-cde-prod-common,pcicde-p-comm.prod
+pci-cde-prod-c-pago,pcicde-p-cpag.prod
+pci-non-prod-c-pago,pcino-p-cpag.prod
+pci-non-dev-c-pago,pcino-d-cpag.dev
+pci-non-qa-c-pago,pcino-q-cpag.qa
