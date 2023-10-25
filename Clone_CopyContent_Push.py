@@ -1,3 +1,8 @@
+# This script is designed to automate the process of cloning multiple Git repositories,
+# copying specific files to each cloned repository, committing and pushing those changes to the repositories.
+# It reads a list of Git repository URLs from a 'repositories.txt' file and clones each repository
+# to a working directory specified by 'working_directory'. It clones the repositories from the 'feature/weekend' branch.
+
 import os
 import shutil
 import git
