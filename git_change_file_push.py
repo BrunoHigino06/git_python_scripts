@@ -1,3 +1,7 @@
+# This script automates the process of cloning Git repositories, checking out a specific branch, and
+# editing a 'main.tf' file in those repositories. It replaces occurrences of 'word_find' with 'word_replace' in 'main.tf'.
+# After editing, the script commits and pushes the changes to the repository. The list of repository URLs is read from 'change_file.txt'.
+
 import os
 import git
 import fileinput

@@ -1,3 +1,7 @@
+# This script automates the process of cloning Git repositories, checking out a specific branch, 
+# removing specified files from the cloned repositories, and then committing and pushing the changes. 
+# The list of repository URLs is read from 'remove_push.txt'.
+
 import os
 import git
 
