@@ -50,11 +50,11 @@ for domain in domains:
 
     # Create the JSON block with the extracted "name" value and format records as a list with double quotes
     block = {
-        "zone_id": f'"module.hosted_zone.zone_ids[1]"',
-        "name": f'"{domain}"',
-        "type": '"CNAME"',
-        "ttl": 300,
-        "records": f'["{name_value}"]'  # Use the original domain as the value of CNAME
+        "zone_id =":f'module.hosted_zone.zone_ids[1]"',
+        "name =":f'"{domain}"',
+        "type =":'"CNAME"',
+        "ttl =":300,
+        "records =": f'["{name_value}"]'  # Use the original domain as the value of CNAME
     }
 
     # Add the block to the output list
