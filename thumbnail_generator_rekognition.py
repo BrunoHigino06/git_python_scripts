@@ -125,7 +125,7 @@ def save_frame_locally(video_path, timestamp):
 
     # FFmpeg command to extract the frame
     ffmpeg_command = [
-        '/usr/local/bin/ffmpeg/ffmpeg-7.0.1-amd64-static/ffmpeg', '-i', video_path, '-vf', f'select=eq(n\,{timestamp})', '-vsync', 'vfr', frame_file
+        'ffmpeg', '-i', video_path, '-vf', f'select=eq(n\,{timestamp})', '-vsync', 'vfr', frame_file
     ]
 
     # Execute the FFmpeg command
