@@ -2,7 +2,7 @@ import boto3
 import json
 
 s3 = boto3.client('s3')
-bucket_name = 'thumbnail-generator-poc'
+bucket_name = 'media-ingest-temporary'
 
 def s3_report():
     all_folders = []
@@ -42,12 +42,23 @@ def copy_content_s3(source_key, destination_key):
         s3.copy_object(CopySource=copy_source, Bucket=bucket_name, Key=destination_key)
         print(f"Copy the {source_key} key to the new path {destination_key} finish")
 
+def folder_has_lowercase_video(folder_key):
+    response = s3.list_objects_v2(Bucket=bucket_name, Prefix=folder_key.replace('Video/', 'video/'))
+    for obj in response.get('Contents', []):
+        if 'video/' in obj['Key']:
+            return True
+    return False
+
 def process_folders():
     folders = json.loads(s3_report())
     
     for folder in folders:
         video_folder = folder['Key']
         new_folder = video_folder.replace('Video/', 'video/')
+        
+        if folder_has_lowercase_video(video_folder):
+            print(f"Folder {video_folder} already has a lowercase 'video/' folder. Skipping...")
+            continue
         
         create_folder_s3(new_folder)
         
