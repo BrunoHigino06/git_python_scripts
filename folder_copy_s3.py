@@ -38,8 +38,9 @@ def create_folder_s3(folder_key):
 def copy_content_s3(source_key, destination_key):
     if not source_key.endswith('/'):
         copy_source = {'Bucket': bucket_name, 'Key': source_key}
-        s3.copy_object(CopySource=copy_source, Bucket=bucket_name, Key=destination_key)
         print(f"Copy the {source_key} key to the new path {destination_key}")
+        s3.copy_object(CopySource=copy_source, Bucket=bucket_name, Key=destination_key)
+        print(f"Copy the {source_key} key to the new path {destination_key} finish")
 
 def process_folders():
     folders = json.loads(s3_report())
