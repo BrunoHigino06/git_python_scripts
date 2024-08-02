@@ -3,8 +3,8 @@ import boto3
 import subprocess
 
 s3 = boto3.client('s3')
-source_bucket_name = 'thumbnail-generator-poc-31-07-24'
-destination_bucket_name = 'thumbnail-generator-poc-31-07-24'
+source_bucket_name = 'thumbnail-requeriments'
+destination_bucket_name = 'thumbnail-requeriments'
 time_frames = ['00:10:00', '00:20:00', '00:30:00', '00:40:00', '00:50:00']
 ffmpeg_path = "/opt/bin/ffmpeg"
 
@@ -58,6 +58,7 @@ def lambda_handler(event, context):
         output_dir = '/tmp'
 
         try:
+            print(f'Processing video: {video_key}')  # Additional logging
             # Download video from S3
             s3_download(source_bucket_name, video_key, local_video_path)
             
@@ -77,6 +78,9 @@ def lambda_handler(event, context):
                     create_thumbnail(local_video_path, frame, frame_thumbnail, width, height)
                     thumbnail_key = f'{base_dir}/{video_id}/image_{frame.replace(":", "-")}_{width}x{height}.{format}'
                     s3_upload(thumbnail_key, destination_bucket_name, f'{frame_thumbnail}.{format}')
+
+            # Clean up EFS after processing
+            os.remove(local_video_path)
 
         except Exception as e:
             print(f'Error in processing: {str(e)}')
