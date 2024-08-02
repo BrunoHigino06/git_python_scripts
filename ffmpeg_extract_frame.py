@@ -1,22 +1,22 @@
 import os
 import boto3
-import subprocess
+import ffmpeg
 
 s3 = boto3.client('s3')
 bucket_name = 'thumbnail-generator-poc'
-local_video_path = '/tmp/video.mp4'
+local_video_path = '/tmp/1005010002.mp4'
 video_key = '100000/video/1005010002.mp4'
-time_frames = ['00:05:00', '00:10:00', '00:15:00', '00:20:00', '00:25:00', '00:30:00', '00:35:00', '00:40:00', '00:45:00', '00:50:00', '00:55:00', '01:00:00']
+time_frames = ['00:10:00', '00:20:00', '00:30:00', '00:40:00', '00:50:00']
 
 # Garantir que o diretório de saída exista
-output_dir = './tmp'
+output_dir = '/home/cloudshell-user/tmp'
 os.makedirs(output_dir, exist_ok=True)
 
 def s3_download(bucket_name, video_key, video_path):
     try:
         print(f'Downloading video: {video_key} from the S3 bucket: {bucket_name} to {video_path}')
         s3.download_file(bucket_name, video_key, video_path)
-
+        # Verificar se o arquivo foi baixado com sucesso
         if not os.path.exists(video_path):
             raise Exception(f'File {video_path} does not exist after download.')
     except Exception as e:
@@ -24,15 +24,19 @@ def s3_download(bucket_name, video_key, video_path):
         raise
 
 def create_thumbnail(video_path, frame, frame_thumbnail):
-    ffmpeg_command = [
-        'ffmpeg', '-i', video_path, '-ss', frame, '-vsync', 'vfr', '-frames:v', '1', frame_thumbnail
-    ]
-    result = subprocess.run(ffmpeg_command, capture_output=True, text=True)
-    print(f'FFmpeg command output: {result.stdout}')
-    print(f'FFmpeg command error: {result.stderr}')
-
-    if not os.path.exists(frame_thumbnail):
-        raise Exception(f'Thumbnail {frame_thumbnail} was not created successfully.')
+    try:
+        (
+            ffmpeg
+            .input(video_path, ss=frame)
+            .output(frame_thumbnail, vframes=1)
+            .run(capture_stdout=True, capture_stderr=True)
+        )
+        # Verificar se a miniatura foi criada com sucesso
+        if not os.path.exists(frame_thumbnail):
+            raise Exception(f'Thumbnail {frame_thumbnail} was not created successfully.')
+    except ffmpeg.Error as e:
+        print(f'FFmpeg error: {e.stderr.decode()}')
+        raise
 
 def s3_upload(file_key, bucket_name, image_file):
     try:
