@@ -6,7 +6,7 @@ s3 = boto3.client('s3')
 bucket_name = 'thumbnail-generator-poc'
 local_video_path = '/tmp/1005010002.mp4'
 video_key = '100000/video/1005010002.mp4'
-time_frames = ['00:10:00', '00:20:00', '00:30:00', '00:40:00', '00:50:00']
+time_frames = ['00:05:00']
 
 # Garantir que o diretório de saída exista
 output_dir = '/home/cloudshell-user/tmp'
