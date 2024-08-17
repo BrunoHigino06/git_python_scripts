@@ -73,7 +73,7 @@ def process_videos():
         all_thumbnails_exist = True
         for frame in time_frames:
             for width, height, name in sizes:
-                thumbnail_key = f'{root_dir}/{name}_{video_filename}_{frame.replace(":", "-")}.{format}'
+                thumbnail_key = f'{root_dir}/{name}.{format}'
                 if not thumbnail_exists(destination_bucket_name, thumbnail_key):
                     all_thumbnails_exist = False
                     break
