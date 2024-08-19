@@ -1,6 +1,7 @@
 import os
 import boto3
 import subprocess
+from datetime import datetime
 
 # Initialize the S3 client
 s3 = boto3.client('s3')
@@ -10,7 +11,7 @@ source_bucket_name = 'avs-vod-mc-input-2c87c40d939653bdbef99ff1ce204afc'
 destination_bucket_name = 'caracol-image-ingest-prod'
 
 # Path to the FFmpeg binary in CloudShell
-ffmpeg_path = "/home/cloudshell-user/ffmpeg-7.0.1-amd64-static/ffmpeg"
+ffmpeg_path = "/mnt/c/Users/Bruno/Desktop/clients/python_scripts/ffmpeg-7.0.1-amd64-static/ffmpeg"
 
 # Thumbnail sizes and corresponding names
 sizes = [
@@ -81,20 +82,20 @@ def process_videos():
                 break
 
         if all_thumbnails_exist:
-            print(f'All thumbnails for {video_key} already exist, skipping download and generation.')
+            print(f'[{datetime.now()}] All thumbnails for {video_key} already exist, skipping download and generation.')
             continue
 
         # Log message before downloading the next video
-        print(f'Starting download of video {video_key} from {source_bucket_name}...')
+        print(f'[{datetime.now()}] Starting download of video {video_key} from {source_bucket_name}...')
 
         local_video_path = f'/tmp/{os.path.basename(video_key)}'
 
         # Download the video from the source bucket
         s3.download_file(source_bucket_name, video_key, local_video_path)
-        print(f'Finished downloading video {video_key}.')
+        print(f'[{datetime.now()}] Finished downloading video {video_key}.')
 
         # Log message before starting the thumbnail generation
-        print(f'Starting thumbnail generation for video {video_key}...')
+        print(f'[{datetime.now()}] Starting thumbnail generation for video {video_key}...')
 
         for frame in time_frames:
             for width, height, name in sizes:
@@ -108,7 +109,7 @@ def process_videos():
 
         # Remove the local video file after processing
         os.remove(local_video_path)
-        print(f'Finished processing video {video_key}.\n')
+        print(f'[{datetime.now()}] Finished processing video {video_key}.\n')
 
 if __name__ == '__main__':
     process_videos()
