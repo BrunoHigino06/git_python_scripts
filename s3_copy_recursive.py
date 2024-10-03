@@ -1,8 +1,8 @@
 import subprocess
 
-def copy_s3_files(source_account_id, dest_account_id, source_bucket, source_path, dest_bucket, dest_path, max_directories=100):
+def copy_s3_files(source_account_id, dest_account_id, source_bucket, source_path, dest_bucket, dest_path, start_dir, end_dir):
     """
-    Copia os primeiros 'max_directories' diretórios de um bucket S3 de uma conta para outra.
+    Copia os diretórios de um bucket S3 de uma conta para outra dentro de um intervalo especificado.
 
     :param source_account_id: ID da conta de origem.
     :param dest_account_id: ID da conta de destino.
@@ -10,7 +10,8 @@ def copy_s3_files(source_account_id, dest_account_id, source_bucket, source_path
     :param source_path: Caminho no bucket de origem.
     :param dest_bucket: Nome do bucket de destino.
     :param dest_path: Caminho no bucket de destino.
-    :param max_directories: Número máximo de diretórios a copiar (default: 100).
+    :param start_dir: Diretório inicial no intervalo.
+    :param end_dir: Diretório final no intervalo.
     """
     count = 0
 
@@ -32,18 +33,16 @@ def copy_s3_files(source_account_id, dest_account_id, source_bucket, source_path
         
         directories = result.stdout.splitlines()
 
-        # Iterar sobre os diretórios e copiar até atingir o máximo de 'max_directories'
+        # Iterar sobre os diretórios e copiar aqueles que estão no intervalo especificado
         for directory in directories:
-            if count >= max_directories:
-                print(f"Máximo de diretórios copiados: {max_directories}")
-                break
-
             # Extrair o nome do diretório (espera-se que ele termine com '/')
-            dir_name = directory.split()[-1]
-            if dir_name.endswith('/'):
+            dir_name = directory.split()[-1].strip('/')
+
+            # Verificar se o diretório está dentro do intervalo especificado
+            if start_dir <= dir_name <= end_dir:
                 # Caminhos completos S3 para origem e destino
-                source_dir = f"{source_prefix}{dir_name}"
-                dest_dir = f"s3://{dest_bucket}/{dest_path}/{dir_name}"
+                source_dir = f"{source_prefix}{dir_name}/"
+                dest_dir = f"s3://{dest_bucket}/{dest_path}/{dir_name}/"
                 
                 # Comando AWS CLI para copiar o diretório
                 copy_command = f"aws s3 cp {source_dir} {dest_dir} --recursive"
@@ -56,22 +55,28 @@ def copy_s3_files(source_account_id, dest_account_id, source_bucket, source_path
                 if copy_result.returncode != 0:
                     print(f"Erro ao copiar o diretório {dir_name}: {copy_result.stderr}")
                 else:
-                    print(f"Diretório copiado com sucesso: {dir_name} ({count + 1}/{max_directories})")
+                    print(f"Diretório copiado com sucesso: {dir_name}")
                 
                 # Incrementa o contador
                 count += 1
 
+        if count == 0:
+            print("Nenhum diretório foi encontrado no intervalo especificado.")
+    
     except Exception as e:
         print(f"Erro inesperado: {e}")
 
 # Variáveis configuráveis
 source_account_id = "851725566176"  # ID da conta de origem
-dest_account_id = "471112645351"     # ID da conta de destino
-source_bucket = "media-ingest-temporary"
-source_path = "1005000000/1005010000/"
-dest_bucket = "thumbnail-generator-poc-31-07-24"
-dest_path = "1005000000/1005010000"
-max_directories = 2  # Pode alterar o número de diretórios a copiar
+dest_account_id = "471112645351"    # ID da conta de destino
+source_bucket = "media-ingest-temporary"  # Bucket de origem
+source_path = "1007000000/1007010000/"    # Caminho de origem
+dest_bucket = "avs-vod-mc-input-2c87c40d939653bdbef99ff1ce204afc"  # Bucket de destino
+dest_path = "1007000000/1007010000"  # Caminho de destino
+
+# Intervalo de diretórios a copiar
+start_dir = "1012010201"
+end_dir = "1012010374"
 
 # Chama a função para executar a cópia
-copy_s3_files(source_account_id, dest_account_id, source_bucket, source_path, dest_bucket, dest_path, max_directories)
+copy_s3_files(source_account_id, dest_account_id, source_bucket, source_path, dest_bucket, dest_path, start_dir, end_dir)
