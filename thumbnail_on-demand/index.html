@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thumbnail Generator</title>
+</head>
+<body>
+    <h1>Generate Thumbnails</h1>
+    <form id="thumbnailForm">
+        <label for="sourceBucket">Source Bucket:</label><br>
+        <input type="text" id="sourceBucket" name="sourceBucket" required><br><br>
+        
+        <label for="videoKey">Video Key (Path):</label><br>
+        <input type="text" id="videoKey" name="videoKey" required><br><br>
+        
+        <label for="destinationBucket">Destination Bucket:</label><br>
+        <input type="text" id="destinationBucket" name="destinationBucket" required><br><br>
+        
+        <button type="submit">Generate Thumbnail</button>
+    </form>
+
+    <div id="progress" style="margin-top: 20px;">
+        <h2>Progress:</h2>
+        <pre id="logOutput"></pre> <!-- Local onde os logs aparecerão -->
+    </div>
+
+    <div id="result" style="margin-top: 20px;">
+        <h2>Generated Thumbnails</h2>
+        <div id="thumbnails"></div>
+    </div>
+
+    <script>
+        document.getElementById('thumbnailForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            const sourceBucket = document.getElementById('sourceBucket').value;
+            const videoKey = document.getElementById('videoKey').value;
+            const destinationBucket = document.getElementById('destinationBucket').value;
+
+            // Inicia a geração dos thumbnails
+            fetch('https://<your-api-endpoint>', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    source_bucket: sourceBucket,
+                    video_key: videoKey,
+                    destination_bucket: destinationBucket
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.jobId) {
+                    // Inicia o long polling para acompanhar o progresso
+                    pollProgress(data.jobId);
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        });
+
+        function pollProgress(jobId) {
+            const interval = setInterval(() => {
+                fetch(`https://<your-api-endpoint>/progress?jobId=${jobId}`, {
+                    method: 'GET',
+                })
+                .then(response => response.json())
+                .then(data => {
+                    const logOutput = document.getElementById('logOutput');
+                    logOutput.textContent = data.logs.join('\n'); // Atualiza os logs
+
+                    if (data.status === 'completed') {
+                        clearInterval(interval); // Para o polling quando terminar
+
+                        const thumbnailsDiv = document.getElementById('thumbnails');
+                        thumbnailsDiv.innerHTML = '';
+
+                        data.thumbnails.forEach(thumbnailUrl => {
+                            const img = document.createElement('img');
+                            img.src = thumbnailUrl;
+                            img.style.width = '200px';  // Ajuste o tamanho da imagem conforme necessário
+                            thumbnailsDiv.appendChild(img);
+                        });
+                    } else if (data.status === 'failed') {
+                        clearInterval(interval); // Para o polling se houver falha
+                        logOutput.textContent += "\nProcess failed.";
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+            }, 5000); // Verifica a cada 5 segundos
+        }
+    </script>
+</body>
+</html>
