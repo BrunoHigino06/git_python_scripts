@@ -2,26 +2,15 @@ import os
 import boto3
 import subprocess
 
-# Explanation:
-# This AWS Lambda function is triggered by an S3 event, which indicates that a new video file has been uploaded to an S3 bucket.
-# The function performs the following steps:
-# 1. Downloads the video file from the S3 bucket to the local temporary directory.
-# 2. Generates thumbnails at specific time frames and resolutions using FFmpeg.
-# 3. Uploads the generated thumbnails back to the root folder of the key in the S3 bucket.
-# The thumbnails are named according to their resolution and include the mp4 file name:
-# - 260x163: 'landscape-regular-thumb-mobile'
-# - 377x236: 'landscape-regular-thumb-tablet'
-# - 426x267: 'landscape-regular-thumb-tv'
-
 # Initialize the S3 client
 s3 = boto3.client('s3')
 
 # Source and destination S3 bucket names
-source_bucket_name = 'thumbnail-requeriments'
-destination_bucket_name = 'thumbnail-requeriments'
+source_bucket_name = 'avs-vod-mc-input-2c87c40d939653bdbef99ff1ce204afc'
+destination_bucket_name = 'caracol-image-ingest-prod'
 
 # Time frames to capture thumbnails from the video
-time_frames = ['00:10:00', '00:20:00', '00:30:00', '00:40:00', '00:50:00']
+time_frames = ['00:05:00']
 
 # Path to the FFmpeg binary
 ffmpeg_path = "/opt/bin/ffmpeg"
@@ -77,6 +66,10 @@ def s3_upload(file_key, bucket_name, image_file):
 
 # Lambda function handler
 def lambda_handler(event, context):
+    # List contents of /tmp at the start of the process
+    print("Contents of /tmp before starting the process:")
+    subprocess.run(['ls', '-lh', '/tmp'])
+    
     for record in event['Records']:
         video_key = record['s3']['object']['key']
         local_video_path = f'/tmp/{os.path.basename(video_key)}'
@@ -99,18 +92,41 @@ def lambda_handler(event, context):
 
             for frame in time_frames:
                 for width, height, name in sizes:
-                    frame_thumbnail = os.path.join(output_dir, f'{name}_{video_filename}_{frame.replace(":", "-")}')
+                    frame_thumbnail = os.path.join(output_dir, f'{name}')
                     create_thumbnail(local_video_path, frame, frame_thumbnail, width, height)
-                    thumbnail_key = f'{root_dir}/{name}_{video_filename}_{frame.replace(":", "-")}.{format}'
+                    thumbnail_key = f'{root_dir}/{name}.{format}'
                     s3_upload(thumbnail_key, destination_bucket_name, f'{frame_thumbnail}.{format}')
+                    
+                    # List contents of /tmp before removing thumbnail
+                    print("Contents of /tmp before removing thumbnail:")
+                    subprocess.run(['ls', '-lh', '/tmp'])
+
+                    # Clean up each thumbnail after upload
+                    thumbnail_path = f'{frame_thumbnail}.{format}'
+                    if os.path.exists(thumbnail_path):
+                        os.remove(thumbnail_path)
+                        print(f'Thumbnail {thumbnail_path} removed from /tmp/')  # Added print to signal deletion
+                    
+                    # List contents of /tmp after removing thumbnail
+                    print("Contents of /tmp after removing thumbnail:")
+                    subprocess.run(['ls', '-lh', '/tmp'])
+
+            # List contents of /tmp before removing video
+            print("Contents of /tmp before removing video:")
+            subprocess.run(['ls', '-lh', '/tmp'])
 
             # Clean up local video file
             os.remove(local_video_path)
+            print(f'Video {local_video_path} removed from /tmp/')  # Additional print for video removal
+
+            # List contents of /tmp after removing video
+            print("Contents of /tmp after removing video:")
+            subprocess.run(['ls', '-lh', '/tmp'])
 
         except Exception as e:
             print(f'Error in processing: {str(e)}')
 
     return {
         'statusCode': 200,
-        'body': 'Thumbnails generated and uploaded successfully!'
+        'body': 'Thumbnails generated, uploaded, and cleaned up successfully!'
     }
