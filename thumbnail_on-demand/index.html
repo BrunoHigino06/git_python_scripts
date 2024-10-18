@@ -4,90 +4,127 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Thumbnail Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        label {
+            display: block;
+            margin-top: 10px;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+        }
+        button {
+            margin-top: 15px;
+            padding: 10px 15px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        pre {
+            background-color: #f4f4f4;
+            padding: 10px;
+        }
+    </style>
 </head>
 <body>
-    <h1>Generate Thumbnails</h1>
-    <form id="thumbnailForm">
-        <label for="sourceBucket">Source Bucket:</label><br>
-        <input type="text" id="sourceBucket" name="sourceBucket" required><br><br>
-        
-        <label for="videoKey">Video Key (Path):</label><br>
-        <input type="text" id="videoKey" name="videoKey" required><br><br>
-        
-        <label for="destinationBucket">Destination Bucket:</label><br>
-        <input type="text" id="destinationBucket" name="destinationBucket" required><br><br>
-        
-        <button type="submit">Generate Thumbnail</button>
+
+    <h1>Thumbnail Generator</h1>
+
+    <form id="lambdaForm">
+        <label for="sourceBucket">Source Bucket</label>
+        <input type="text" id="sourceBucket" name="source_bucket" required>
+
+        <label for="videoKey">Video Key</label>
+        <input type="text" id="videoKey" name="video_key" required>
+
+        <label for="destinationBucket">Destination Bucket</label>
+        <input type="text" id="destinationBucket" name="destination_bucket" required>
+
+        <label for="timeFrames">Time Frames (comma-separated, e.g., 00:00:01,00:00:05)</label>
+        <input type="text" id="timeFrames" name="time_frames" value="00:00:01">
+
+        <button type="submit" id="submit-button">Submit</button>
     </form>
 
-    <div id="progress" style="margin-top: 20px;">
-        <h2>Progress:</h2>
-        <pre id="logOutput"></pre> <!-- Local onde os logs aparecerão -->
-    </div>
-
-    <div id="result" style="margin-top: 20px;">
-        <h2>Generated Thumbnails</h2>
-        <div id="thumbnails"></div>
-    </div>
+    <h2>Response:</h2>
+    <pre id="responseOutput"></pre>
 
     <script>
-        document.getElementById('thumbnailForm').addEventListener('submit', function(event) {
+        document.getElementById('lambdaForm').addEventListener('submit', async function (event) {
             event.preventDefault();
+
+            // Limpar o conteúdo do campo de resposta antes de uma nova execução
+            document.getElementById('responseOutput').textContent = '';
+
+            const submitButton = document.getElementById('submit-button');
+            const originalText = submitButton.textContent;
+            const originalColor = submitButton.style.backgroundColor;
+
+            // Alterar texto e cor ao iniciar a execução
+            submitButton.textContent = 'Execution in Progress';
+            submitButton.style.backgroundColor = '#ffc107';  // Cor amarela durante a execução
 
             const sourceBucket = document.getElementById('sourceBucket').value;
             const videoKey = document.getElementById('videoKey').value;
             const destinationBucket = document.getElementById('destinationBucket').value;
+            const timeFrames = document.getElementById('timeFrames').value.split(',');
 
-            // Inicia a geração dos thumbnails
-            fetch('https://<your-api-endpoint>', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    source_bucket: sourceBucket,
-                    video_key: videoKey,
-                    destination_bucket: destinationBucket
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.jobId) {
-                    // Inicia o long polling para acompanhar o progresso
-                    pollProgress(data.jobId);
+            const requestBody = {
+                source_bucket: sourceBucket,
+                video_key: videoKey,
+                destination_bucket: destinationBucket,
+                time_frames: timeFrames
+            };
+
+            const lambdaUrl = 'https://noof6bxcedml3lvqzpnrvu563m0vciam.lambda-url.us-east-2.on.aws/'; // Insira a URL do Lambda
+
+            try {
+                const response = await fetch(lambdaUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    document.getElementById('responseOutput').innerHTML = `
+                        <p>Thumbnail generation process completed!</p>
+                        <p>Logs:</p>
+                        <pre>${data.logs ? data.logs.join('\n') : 'No logs available.'}</pre>
+                        <p>Thumbnails: ${JSON.stringify(data.thumbnails, null, 4)}</p>
+                        <p><a href="${data.log_url}" target="_blank">View CloudWatch Logs</a></p>
+                    `;
+                } else {
+                    console.error('Error:', data.error);
+                    document.getElementById('responseOutput').innerHTML = `
+                        <p>Error: ${data.error}</p>
+                        <p>Logs:</p>
+                        <pre>${data.logs.join('\n')}</pre>
+                        <p><a href="${data.log_url}" target="_blank">View CloudWatch Logs</a></p>
+                    `;
                 }
-            })
-            .catch(error => console.error('Error:', error));
+            } catch (error) {
+                console.error('Fetch error:', error);
+                document.getElementById('responseOutput').textContent = 'An error occurred while processing your request.';
+            } finally {
+                // Restaurar o texto e a cor do botão
+                submitButton.textContent = originalText;
+                submitButton.style.backgroundColor = originalColor;
+            }
         });
-
-        function pollProgress(jobId) {
-            const interval = setInterval(() => {
-                fetch(`https://<your-api-endpoint>/progress?jobId=${jobId}`, {
-                    method: 'GET',
-                })
-                .then(response => response.json())
-                .then(data => {
-                    const logOutput = document.getElementById('logOutput');
-                    logOutput.textContent = data.logs.join('\n'); // Atualiza os logs
-
-                    if (data.status === 'completed') {
-                        clearInterval(interval); // Para o polling quando terminar
-
-                        const thumbnailsDiv = document.getElementById('thumbnails');
-                        thumbnailsDiv.innerHTML = '';
-
-                        data.thumbnails.forEach(thumbnailUrl => {
-                            const img = document.createElement('img');
-                            img.src = thumbnailUrl;
-                            img.style.width = '200px';  // Ajuste o tamanho da imagem conforme necessário
-                            thumbnailsDiv.appendChild(img);
-                        });
-                    } else if (data.status === 'failed') {
-                        clearInterval(interval); // Para o polling se houver falha
-                        logOutput.textContent += "\nProcess failed.";
-                    }
-                })
-                .catch(error => console.error('Error:', error));
-            }, 5000); // Verifica a cada 5 segundos
-        }
     </script>
+
 </body>
 </html>

@@ -3,45 +3,69 @@ import boto3
 import subprocess
 import json
 
-# Variáveis de input configuráveis no topo
-SOURCE_BUCKET_NAME = '<your-source-bucket>'  # Nome do bucket de origem do arquivo .mp4
-VIDEO_KEY = '<path/to/your/video.mp4>'  # Caminho do arquivo .mp4 no bucket de origem
-DESTINATION_BUCKET_NAME = '<your-destination-bucket>'  # Nome do bucket de destino para os thumbnails
-LOG_BUCKET = '<your-log-bucket>'  # Nome do bucket onde os logs serão armazenados
-FFMPEG_PATH = "/opt/bin/ffmpeg"  # Caminho do FFmpeg
-TIME_FRAMES = ['00:05:00']  # Lista de frames de tempo para gerar os thumbnails
-SIZES = [  # Tamanhos de thumbnails
-    (260, 163, 'landscape-regular-thumb-mobile'),
-    (377, 236, 'landscape-regular-thumb-tablet'),
-    (426, 267, 'landscape-regular-thumb-tv')
-]
-FORMAT = 'jpg'  # Formato das thumbnails
-
 # Inicializa o cliente S3
 s3 = boto3.client('s3')
 s3_resource = boto3.resource('s3')
 
+# Defina o bucket de logs como uma variável fixa
+LOG_BUCKET = 'thumbnail-on-demand'
+
+# Configurações de tamanho para thumbnails
+SIZES = [
+    (260, 163, 'landscape-regular-thumb-mobile'),
+    (377, 236, 'landscape-regular-thumb-tablet'),
+    (426, 267, 'landscape-regular-thumb-tv')
+]
+
+# Formato de saída das thumbnails
+FORMAT = 'jpg'
+
+def cleanup_tmp():
+    """Remove todos os arquivos do diretório /tmp"""
+    try:
+        for filename in os.listdir('/tmp'):
+            file_path = os.path.join('/tmp', filename)
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+    except Exception as e:
+        print(f'Erro ao limpar o diretório /tmp: {str(e)}')
+
 def write_logs_to_s3(logs, job_id):
     """Escreve os logs no bucket de logs no S3"""
-    s3.put_object(
-        Bucket=LOG_BUCKET,
-        Key=f'logs/{job_id}.json',
-        Body=json.dumps(logs),
-        ContentType='application/json'
-    )
-
-def s3_download(bucket_name, video_key, video_path, logs, job_id):
-    """Faz download do arquivo de vídeo do S3"""
     try:
-        log_message = f'Downloading video: {video_key} from the S3 bucket: {bucket_name}'
+        s3.put_object(
+            Bucket=LOG_BUCKET,
+            Key=f'logs/{job_id}.json',
+            Body=json.dumps(logs),
+            ContentType='application/json'
+        )
+    except Exception as e:
+        print(f'Erro ao escrever logs no S3: {str(e)}')
+
+def download_video_segment(bucket_name, video_key, start_time, duration, local_video_path, logs, job_id):
+    """Baixa um segmento do vídeo do S3 usando FFmpeg"""
+    try:
+        log_message = f'Downloading video segment: {video_key} from the S3 bucket: {bucket_name} starting at {start_time} for {duration} seconds'
         logs.append(log_message)
         write_logs_to_s3(logs, job_id)
+
+        # Baixar o vídeo do S3 para o diretório EFS
+        s3.download_file(bucket_name, video_key, local_video_path)
         
-        s3.download_file(bucket_name, video_key, video_path)
-        if not os.path.exists(video_path):
-            raise Exception(f'File {video_path} does not exist after download.')
+        # Comando FFmpeg para baixar o segmento do vídeo
+        ffmpeg_command = [
+            'ffmpeg', '-i', local_video_path, '-ss', str(start_time), 
+            '-t', str(duration), '-c', 'copy', local_video_path
+        ]
+        subprocess.run(ffmpeg_command, check=True)
+        if not os.path.exists(local_video_path):
+            raise FileNotFoundError(f'File {local_video_path} does not exist after download.')
+    except subprocess.CalledProcessError as e:
+        logs.append(f'FFmpeg error: {str(e)}')
+        write_logs_to_s3(logs, job_id)
+        raise
     except Exception as e:
-        logs.append(f'Error downloading video from S3: {str(e)}')
+        logs.append(f'Error downloading video segment from S3: {str(e)}')
         write_logs_to_s3(logs, job_id)
         raise
 
@@ -52,14 +76,18 @@ def create_thumbnail(video_path, frame, frame_thumbnail, width, height, logs, jo
         write_logs_to_s3(logs, job_id)
         
         ffmpeg_command = [
-            FFMPEG_PATH, '-i', video_path, '-ss', frame, '-vframes', '1', 
-            '-vf', f'scale={width}:{height}', f'{frame_thumbnail}.{FORMAT}'
+            'ffmpeg', '-i', video_path, '-ss', frame, '-vframes', '1', 
+            '-vf', f'scale={width}:{height}', frame_thumbnail
         ]
         subprocess.run(ffmpeg_command, check=True)
-        if not os.path.exists(f'{frame_thumbnail}.{FORMAT}'):
-            raise Exception(f'Thumbnail {frame_thumbnail}.{FORMAT} was not created successfully.')
+        if not os.path.exists(frame_thumbnail):
+            raise Exception(f'Thumbnail {frame_thumbnail} was not created successfully.')
     except subprocess.CalledProcessError as e:
         logs.append(f'FFmpeg error: {str(e)}')
+        write_logs_to_s3(logs, job_id)
+        raise
+    except Exception as e:
+        logs.append(f'Error creating thumbnail: {str(e)}')
         write_logs_to_s3(logs, job_id)
         raise
 
@@ -81,32 +109,40 @@ def s3_upload(file_key, bucket_name, image_file, logs, job_id):
         write_logs_to_s3(logs, job_id)
         raise
 
-def process_video(source_bucket_name, video_key, destination_bucket_name, logs, job_id):
+def process_video(source_bucket_name, video_key, destination_bucket_name, time_frames, logs, job_id):
     """Processa o vídeo e gera thumbnails"""
-    local_video_path = f'/tmp/{os.path.basename(video_key)}'
-    output_dir = '/tmp'
+    local_video_path = f'/tmp/{os.path.basename(video_key)}'  # Usando o EFS em vez de /tmp
+    output_dir = '/tmp'  # Usando o EFS
     thumbnail_urls = []
+    
+    # Defina o tempo inicial e a duração do segmento do vídeo que você quer baixar
+    START_TIME = 0  # Por exemplo, inicie do início
+    DURATION = 10  # Duração de 10 segundos
 
     try:
         logs.append(f'Processing video: {video_key}')
         write_logs_to_s3(logs, job_id)
         
-        # Faz download do vídeo
-        s3_download(source_bucket_name, video_key, local_video_path, logs, job_id)
+        # Faz download de um segmento do vídeo
+        download_video_segment(source_bucket_name, video_key, START_TIME, DURATION, local_video_path, logs, job_id)
         
         # Divide o caminho do arquivo para formar o caminho de destino dos thumbnails
         key_parts = video_key.split('/')
-        root_dir = '/'.join(key_parts[:-2])  # Exemplo: 10020000/10020100/10020101
+        root_dir = '/'.join(key_parts[:-2])  # Exemplo: 1012000000/1012010000/1012010001
         video_filename = os.path.splitext(key_parts[-1])[0]
 
         # Para cada frame de tempo e tamanho, gera os thumbnails
-        for frame in TIME_FRAMES:
+        for frame in time_frames:
             for width, height, name in SIZES:
-                frame_thumbnail = os.path.join(output_dir, f'{name}_{video_filename}_{frame}')
+                # Mude o caminho do thumbnail para usar o nome correto
+                frame_thumbnail = os.path.join(output_dir, f'{name}.{FORMAT}')
+                
+                # Gera a thumbnail
                 create_thumbnail(local_video_path, frame, frame_thumbnail, width, height, logs, job_id)
 
-                file_key = f'{root_dir}/{name}/{video_filename}_{frame}.{FORMAT}'
-                s3_upload(file_key, destination_bucket_name, f'{frame_thumbnail}.{FORMAT}', logs, job_id)
+                # Ajusta o file_key para que as imagens sejam armazenadas no diretório do vídeo
+                file_key = f'{root_dir}/{name}.{FORMAT}'  # Ajusta para o nome desejado
+                s3_upload(file_key, destination_bucket_name, frame_thumbnail, logs, job_id)
 
                 thumbnail_urls.append(f's3://{destination_bucket_name}/{file_key}')
 
@@ -118,40 +154,50 @@ def process_video(source_bucket_name, video_key, destination_bucket_name, logs, 
     return thumbnail_urls
 
 def lambda_handler(event, context):
-    # O Lambda agora usa as variáveis definidas no topo
-    source_bucket_name = SOURCE_BUCKET_NAME
-    video_key = VIDEO_KEY
-    destination_bucket_name = DESTINATION_BUCKET_NAME
-
-    job_id = context.aws_request_id
-    logs = []
-
+    """AWS Lambda function handler."""
+    logs = []  # Inicializar os logs
     try:
-        logs.append('Started thumbnail generation process.')
+
+        cleanup_tmp()
+        # Analisar o corpo do evento
+        body = json.loads(event['body'])
+        source_bucket_name = body['source_bucket']
+        video_key = body['video_key']
+        destination_bucket_name = body['destination_bucket']
+        time_frames = body['time_frames']
+
+        job_id = context.aws_request_id
+        logs.append(f'Received request: {json.dumps(body)}')
+
         write_logs_to_s3(logs, job_id)
-        
-        # Processa o vídeo e gera thumbnails
-        thumbnail_urls = process_video(source_bucket_name, video_key, destination_bucket_name, logs, job_id)
-        
-        logs.append('Thumbnail generation completed.')
-        write_logs_to_s3(logs, job_id)
-        
+
+        thumbnail_urls = process_video(source_bucket_name, video_key, destination_bucket_name, time_frames, logs, job_id)
+
+        # Construir o link para os logs do CloudWatch
+        log_url = f'https://console.aws.amazon.com/cloudwatch/home?region={context.invoked_function_arn.split(":")[3]}#logsV2:log-groups/log-group:/aws/lambda/{context.function_name}/log-events/{job_id}'
+
         return {
             'statusCode': 200,
             'body': json.dumps({
-                'jobId': job_id,
+                'message': 'Thumbnail generation process completed!',
+                'logs': logs,
                 'thumbnails': thumbnail_urls,
-                'logs': logs
+                'log_url': log_url  # Adicionando o link para o CloudWatch
             })
         }
     except Exception as e:
-        logs.append(f'Error: {str(e)}')
-        write_logs_to_s3(logs, job_id)
+        error_message = f'Error processing request: {str(e)}'
+        logs.append(error_message)
+        write_logs_to_s3(logs, context.aws_request_id)
+
+        # Construir o link para os logs do CloudWatch em caso de erro
+        log_url = f'https://console.aws.amazon.com/cloudwatch/home?region={context.invoked_function_arn.split(":")[3]}#logsV2:log-groups/log-group:/aws/lambda/{context.function_name}/log-events/{context.aws_request_id}'
+
         return {
             'statusCode': 500,
             'body': json.dumps({
-                'message': 'An error occurred.',
-                'error': str(e),
-                'logs': logs
+                'error': error_message,
+                'logs': logs,
+                'log_url': log_url  # Adicionando o link para o CloudWatch
             })
         }
