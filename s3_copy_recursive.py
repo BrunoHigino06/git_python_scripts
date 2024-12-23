@@ -70,13 +70,13 @@ def copy_s3_files(source_account_id, dest_account_id, source_bucket, source_path
 source_account_id = "851725566176"  # ID da conta de origem
 dest_account_id = "851725566176"    # ID da conta de destino
 source_bucket = "media-ingest-temporary"  # Bucket de origem
-source_path = "1029000000/1029010000/"    # Caminho de origem
+source_path = "1009000000/1009080000/"    # Caminho de origem
 dest_bucket = "avs-vod-mc-input-2c87c40d939653bdbef99ff1ce204afc"  # Bucket de destino
-dest_path = "1029000000/1029010000"  # Caminho de destino
+dest_path = "1009000000/1009080000"  # Caminho de destino
 
 # Intervalo de diretórios a copiar
-start_dir = "1029010001"
-end_dir = "1029010026"
+start_dir = "1009080093"
+end_dir = "1009080101"
 
 # Chama a função para executar a cópia
 copy_s3_files(source_account_id, dest_account_id, source_bucket, source_path, dest_bucket, dest_path, start_dir, end_dir)

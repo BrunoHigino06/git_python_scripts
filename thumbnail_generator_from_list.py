@@ -11,7 +11,7 @@ source_bucket_name = 'avs-vod-mc-input-2c87c40d939653bdbef99ff1ce204afc'
 destination_bucket_name = 'caracol-image-ingest-prod'
 
 # Path to the FFmpeg binary in CloudShell
-ffmpeg_path = "/mnt/c/Users/Bruno/Desktop/clients/python_scripts/ffmpeg-7.0.1-amd64-static/ffmpeg"
+ffmpeg_path = "./ffmpeg-7.0.1-amd64-static/ffmpeg"
 
 # Thumbnail sizes and corresponding names
 sizes = [
@@ -103,8 +103,9 @@ def process_videos(video_keys):
 if __name__ == '__main__':
     # List of video keys to process
     video_keys = [
-        '1003000000/1003010000/1003010001/video/1003010001.mp4',
-        '1003000000/1003010000/1003010002/video/1003010002.mp4',
+        '1014000000/1014080000/1014080067/video/1014080067.mp4',
+        '1014000000/1014090000/1014090050/video/1014090050.mp4',
+        '1014000000/1014090000/1014090051/video/1014090051.mp4'
         # Add more keys as needed
     ]
     process_videos(video_keys)
